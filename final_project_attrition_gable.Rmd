@@ -1,0 +1,515 @@
+---
+title: "final_project_attrition_gable"
+author: "Kyle Gable"
+date: 2023-04-22
+output:
+  html_document:
+    df_print: paged
+---
+
+# An Introduction
+This analysis will investigate the important variables that contribute to the loss of employees (employee attrition) and seeks to answer the question of “What variables play an important role in employee attrition rates?” By utilizing various ML methods, one can hope to obtain a better understanding of the important variables that contribute to employee attrition (Attrition_Status). The objective of this analysis is to identify what variables are important in the prediction of employee attrition (Attrition_Status), if any.
+
+# Data Prep
+Reading in the data:
+```{r CSVReading}
+library(readr)
+attrition <- read_csv("data/turnover.csv")
+
+```
+
+Using `str` and `summary` to get a preliminary look at the data:
+```{r Preliminary}
+str(attrition)
+summary(attrition)
+```
+
+Converting categorical and binary variables to factors:
+```{r Factoring}
+attrition$Attrition_Status <- as.factor(attrition$Attrition_Status)
+attrition$Gender <- as.factor(attrition$Gender)
+attrition$Employee_Industry <- as.factor(attrition$Employee_Industry)
+attrition$Employee_Profession <- as.factor(attrition$Employee_Profession)
+attrition$Source_of_Hire <- as.factor(attrition$Source_of_Hire)
+attrition$Coach <- as.factor(attrition$Coach)
+attrition$Head_Supervisor_Gender <- as.factor(attrition$Head_Supervisor_Gender)
+attrition$Wage_Color <- as.factor(attrition$Wage_Color)
+attrition$Way_to_Work <- as.factor(attrition$Way_to_Work)
+str(attrition)
+summary(attrition)
+```
+
+Cleansing the dataset:
+```{r Cleansing}
+attrition_cleansed <- subset(attrition, Employee_Age != 30.40033257)
+str(attrition_cleansed)
+summary(attrition_cleansed)
+```
+
+## Partitioning the dataset into training and validation/test datasets
+
+Loading in libraries:
+```{r Libraries}
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(MLmetrics)
+library(GGally)
+library(coefplot)
+```
+
+Partitioning the data:
+```{r Parition}
+set.seed(100)
+attrition_cleansed_intraining <- createDataPartition(y = attrition_cleansed$Attrition_Status,
+  p = .70,
+  list = FALSE)
+
+attrition_cleansed_training <- attrition_cleansed[attrition_cleansed_intraining,]
+attrition_cleansed_validation <- attrition_cleansed[-attrition_cleansed_intraining,]
+```
+
+## EDA
+
+Creating plots and tabular summaries to explore the variables and see how they might be related:
+```{r EDA}
+attrition_cleansed_training_LM <- glm(formula = Attrition_Status ~ Experience_in_Months + Employee_Age + Extraversion + Agreeableness + Conscientiousness + Neuroticism + Openness + Gender + Employee_Profession + Employee_Industry + Source_of_Hire + Coach + Head_Supervisor_Gender + Way_to_Work + Wage_Color,
+                data = attrition_cleansed_training,
+                family = binomial)
+
+summary(attrition_cleansed_training_LM)
+
+attrition_cleansed_training_cor <- cor(as.data.frame(attrition_cleansed_training[, unlist(lapply(attrition_cleansed_training, is.numeric))]))
+cor(as.data.frame(attrition_cleansed_training[, unlist(lapply(attrition_cleansed_training, is.numeric))]))
+
+attrition_cleansed_training_LM %>% ggpairs(columns = c("Employee_Age", "Extraversion", "Agreeableness", "Conscientiousness", "Neuroticism", "Openness"),
+                                           progress = FALSE)
+attrition_cleansed_training_LM %>% ggpairs(columns = c("Employee_Age", "Extraversion", "Agreeableness", "Conscientiousness", "Neuroticism", "Openness"),
+                                           progress = FALSE) + scale_x_log10()
+attrition_cleansed_training_LM %>% ggpairs(columns = c("Employee_Age", "Extraversion", "Agreeableness", "Conscientiousness", "Neuroticism", "Openness"),
+                                           progress = FALSE) + scale_x_sqrt()
+coefplot(attrition_cleansed_training_LM, predictors=c("Employee_Age", "Extraversion", "Agreeableness", "Conscientiousness", "Neuroticism", "Openness", "Gender", "Employee_Industry", "Source_of_Hire", "Coach", "Head_Supervisor_Gender", "Way_to_Work", "Wage_Color"), sort = c("alphabetical"))
+```
+Looking at the coefficient values themselves INCLUDING for Employee_Profession (Employee_Profession being added to the visual above adds a problem that I could not fix regarding Employee_ProfessionTeaching):
+```{r Coef}
+coef(attrition_cleansed_training_LM)
+```
+
+## Fitting regression models:
+
+```{r Regression_Models}
+attrition_cleansed_training_all_variables <- glm(formula = Attrition_Status ~ Experience_in_Months + Employee_Age + Extraversion + Agreeableness + Conscientiousness + Neuroticism + Openness + Gender + Employee_Profession + Employee_Industry + Source_of_Hire + Coach + Head_Supervisor_Gender + Way_to_Work + Wage_Color,
+                data = attrition_cleansed_training,
+                family = binomial)
+
+attrition_cleansed_training_significant <- glm(formula = Attrition_Status ~ Experience_in_Months + Source_of_Hire + Way_to_Work,
+                data = attrition_cleansed_training,
+                family = binomial)
+
+attrition_cleansed_training_feeling1 <- glm(formula = Attrition_Status ~ Experience_in_Months + Employee_Profession + Employee_Industry + Source_of_Hire + Way_to_Work,
+                data = attrition_cleansed_training,
+                family = binomial)
+
+attrition_cleansed_training_feeling2 <- glm(formula = Attrition_Status ~ Experience_in_Months + Extraversion + Agreeableness + Conscientiousness + Employee_Profession + Employee_Industry + Source_of_Hire + Way_to_Work,
+                data = attrition_cleansed_training,
+                family = binomial)
+
+attrition_cleansed_training_feeling3 <- glm(formula = Attrition_Status ~ Experience_in_Months + Employee_Age + Extraversion + Agreeableness + Conscientiousness + Neuroticism + Gender + Employee_Profession + Employee_Industry + Source_of_Hire + Way_to_Work + Wage_Color,
+                data = attrition_cleansed_training,
+                family = binomial)
+```
+
+### Assessing model fit on training data
+
+```{r Model_fit}
+AIC_Values <- c(summary(attrition_cleansed_training_all_variables)$aic,
+  summary(attrition_cleansed_training_significant)$aic,
+  summary(attrition_cleansed_training_feeling1)$aic,
+  summary(attrition_cleansed_training_feeling2)$aic,
+  summary(attrition_cleansed_training_feeling3)$aic)
+
+AIC_Values
+```
+
+### Using the models to make predictions on the validation data
+
+```{r Predictions}
+Predict1 <- predict(attrition_cleansed_training_all_variables, newdata = attrition_cleansed_validation, type = "response") 
+Predict2 <- predict(attrition_cleansed_training_significant, newdata = attrition_cleansed_validation, type = "response")
+Predict3 <- predict(attrition_cleansed_training_feeling1, newdata = attrition_cleansed_validation, type = "response") 
+Predict4 <- predict(attrition_cleansed_training_feeling2, newdata = attrition_cleansed_validation, type = "response")
+Predict5 <- predict(attrition_cleansed_training_feeling3, newdata = attrition_cleansed_validation, type = "response")
+head(Predict1, 2)
+head(Predict2, 2)
+head(Predict3, 2)
+head(Predict4, 2)
+head(Predict5, 2)
+```
+> Personal Note: Above is the predicted probability that each observation will have an Attrition_Status of "1."
+
+#### Fitting a null model
+
+```{r Nulls}
+# Create a vector of 0's
+Training_null <- rep(0, nrow(attrition_cleansed_training))
+Validation_null <- rep(0, nrow(attrition_cleansed_validation))
+
+cm_training_null <- caret::confusionMatrix(as.factor(Training_null), attrition_cleansed_training$Attrition_Status, positive="1")
+cm_training_null
+
+cm_validation_null <- caret::confusionMatrix(as.factor(Validation_null), attrition_cleansed_validation$Attrition_Status, positive="1")
+cm_validation_null
+```
+
+#### Fitting logistic regression models
+
+```{r Logistic_Regression_Training_Models}
+# Fitting models
+lr_training_all_variables <- glm(Attrition_Status ~ Experience_in_Months + Employee_Age + Extraversion + Agreeableness + Conscientiousness + Neuroticism + Openness + Gender + Employee_Profession + Employee_Industry + Source_of_Hire + Coach + Head_Supervisor_Gender + Way_to_Work + Wage_Color,
+                        data=attrition_cleansed_training,
+                        family=binomial(link="logit"))
+lr_training_significant <- glm(Attrition_Status ~ Experience_in_Months + Source_of_Hire + Way_to_Work,
+                        data=attrition_cleansed_training,
+                        family=binomial(link="logit"))
+lr_training_feeling1 <- glm(Attrition_Status ~ Experience_in_Months + Employee_Profession + Employee_Industry + Source_of_Hire + Way_to_Work,
+                        data=attrition_cleansed_training,
+                        family=binomial(link="logit"))
+lr_training_feeling2 <- glm(Attrition_Status ~ Experience_in_Months + Extraversion + Agreeableness + Conscientiousness + Employee_Profession + Employee_Industry + Source_of_Hire + Way_to_Work,
+                        data=attrition_cleansed_training,
+                        family=binomial(link="logit"))
+lr_training_feeling3 <- glm(Attrition_Status ~ Experience_in_Months + Employee_Age + Extraversion + Agreeableness + Conscientiousness + Neuroticism + Gender + Employee_Profession + Employee_Industry + Source_of_Hire + Way_to_Work + Wage_Color,
+                        data=attrition_cleansed_training,
+                        family=binomial(link="logit"))
+
+## Converting fitted model values into fitted classes
+yhat_lr_training_all_variables <- (lr_training_all_variables$fit > 0.5) * 1
+yhat_lr_training_significant <- (lr_training_significant$fit > 0.5) * 1
+yhat_lr_training_feeling1 <- (lr_training_feeling1$fit > 0.5) * 1
+yhat_lr_training_feeling2 <- (lr_training_feeling2$fit > 0.5) * 1
+yhat_lr_training_feeling3 <- (lr_training_feeling3$fit > 0.5) * 1
+
+fitted_class_lr_training_all_variables <- data.frame(as.factor(lr_training_all_variables$y), as.factor(yhat_lr_training_all_variables))
+names(fitted_class_lr_training_all_variables) <- c("yact", "yhat")
+fitted_class_lr_training_significant <- data.frame(as.factor(lr_training_significant$y), as.factor(yhat_lr_training_significant))
+names(fitted_class_lr_training_significant) <- c("yact", "yhat")
+fitted_class_lr_training_feeling1 <- data.frame(as.factor(lr_training_feeling1$y), as.factor(yhat_lr_training_feeling1))
+names(fitted_class_lr_training_feeling1) <- c("yact", "yhat")
+fitted_class_lr_training_feeling2 <- data.frame(as.factor(lr_training_feeling2$y), as.factor(yhat_lr_training_feeling2))
+names(fitted_class_lr_training_feeling2) <- c("yact", "yhat")
+fitted_class_lr_training_feeling3 <- data.frame(as.factor(lr_training_feeling3$y), as.factor(yhat_lr_training_feeling3))
+names(fitted_class_lr_training_feeling3) <- c("yact", "yhat")
+
+# Creating & displaying confusion matrices
+cm_train_lr_training_all_variables <- confusionMatrix(fitted_class_lr_training_all_variables$yact, fitted_class_lr_training_all_variables$yhat, positive="1")
+cm_train_lr_training_significant <- confusionMatrix(fitted_class_lr_training_significant$yact, fitted_class_lr_training_significant$yhat, positive="1")
+cm_train_lr_training_feeling1 <- confusionMatrix(fitted_class_lr_training_feeling1$yact, fitted_class_lr_training_feeling1$yhat, positive="1")
+cm_train_lr_training_feeling2 <- confusionMatrix(fitted_class_lr_training_feeling2$yact, fitted_class_lr_training_feeling2$yhat, positive="1")
+cm_train_lr_training_feeling3 <- confusionMatrix(fitted_class_lr_training_feeling3$yact, fitted_class_lr_training_feeling3$yhat, positive="1")
+
+cm_train_lr_training_all_variables
+cm_train_lr_training_significant
+cm_train_lr_training_feeling1
+cm_train_lr_training_feeling2
+cm_train_lr_training_feeling3
+```
+
+Making predictions on the validation set data:
+```{r Logistic_Regression_Prediction}
+pred_lr_all_variables <- predict(lr_training_all_variables, newdata = attrition_cleansed_validation, type="response")
+yhat_lr_all_variables <- (pred_lr_all_variables > 0.5) * 1
+pred_lr_significant <- predict(lr_training_significant, newdata = attrition_cleansed_validation, type="response")
+yhat_lr_significant <- (pred_lr_all_variables > 0.5) * 1
+pred_lr_feeling1 <- predict(lr_training_feeling1, newdata = attrition_cleansed_validation, type="response")
+yhat_lr_feeling1 <- (pred_lr_all_variables > 0.5) * 1
+pred_lr_feeling2 <- predict(lr_training_feeling2, newdata = attrition_cleansed_validation, type="response")
+yhat_lr_feeling2 <- (pred_lr_all_variables > 0.5) * 1
+pred_lr_feeling3 <- predict(lr_training_feeling3, newdata = attrition_cleansed_validation, type="response")
+yhat_lr_feeling3 <- (pred_lr_all_variables > 0.5) * 1
+
+predicted_class_lr_all_variables <- data.frame(attrition_cleansed_validation$Attrition_Status, as.factor(yhat_lr_all_variables))
+names(predicted_class_lr_all_variables) <-  c("yact", "yhat")
+predicted_class_lr_significant <- data.frame(attrition_cleansed_validation$Attrition_Status, as.factor(yhat_lr_significant))
+names(predicted_class_lr_significant) <-  c("yact", "yhat")
+predicted_class_lr_feeling1 <- data.frame(attrition_cleansed_validation$Attrition_Status, as.factor(yhat_lr_feeling1))
+names(predicted_class_lr_feeling1) <-  c("yact", "yhat")
+predicted_class_lr_feeling2 <- data.frame(attrition_cleansed_validation$Attrition_Status, as.factor(yhat_lr_feeling2))
+names(predicted_class_lr_feeling2) <-  c("yact", "yhat")
+predicted_class_lr_feeling3 <- data.frame(attrition_cleansed_validation$Attrition_Status, as.factor(yhat_lr_feeling3))
+names(predicted_class_lr_feeling3) <-  c("yact", "yhat")
+
+cm_predicted_lr_all_variables <- confusionMatrix(predicted_class_lr_all_variables$yact, predicted_class_lr_all_variables$yhat, positive="1")
+cm_predicted_lr_significant <- confusionMatrix(predicted_class_lr_all_variables$yact, predicted_class_lr_all_variables$yhat, positive="1")
+cm_predicted_lr_feeling1 <- confusionMatrix(predicted_class_lr_all_variables$yact, predicted_class_lr_all_variables$yhat, positive="1")
+cm_predicted_lr_feeling2 <- confusionMatrix(predicted_class_lr_all_variables$yact, predicted_class_lr_all_variables$yhat, positive="1")
+cm_predicted_lr_feeling3 <- confusionMatrix(predicted_class_lr_all_variables$yact, predicted_class_lr_all_variables$yhat, positive="1")
+
+cm_predicted_lr_all_variables
+cm_predicted_lr_significant
+cm_predicted_lr_feeling1
+cm_predicted_lr_feeling2
+cm_predicted_lr_feeling3
+```
+
+Summarizing the performance of the models' in terms of accuracy, sensitivity, and specificity:
+```{r Logistic_Model_Performance}
+print("Model 1")
+cm_train_lr_training_all_variables$overall['Accuracy']
+cm_train_lr_training_all_variables$byClass['Sensitivity']
+cm_train_lr_training_all_variables$byClass['Specificity']
+print("Model 2")
+cm_train_lr_training_significant$overall['Accuracy']
+cm_train_lr_training_significant$byClass['Sensitivity']
+cm_train_lr_training_significant$byClass['Specificity']
+print("Model 3")
+cm_train_lr_training_feeling1$overall['Accuracy']
+cm_train_lr_training_feeling1$byClass['Sensitivity']
+cm_train_lr_training_feeling1$byClass['Specificity']
+print("Model 4")
+cm_train_lr_training_feeling2$overall['Accuracy']
+cm_train_lr_training_feeling2$byClass['Sensitivity']
+cm_train_lr_training_feeling2$byClass['Specificity']
+print("Model 5")
+cm_train_lr_training_feeling3$overall['Accuracy']
+cm_train_lr_training_feeling3$byClass['Sensitivity']
+cm_train_lr_training_feeling3$byClass['Specificity']
+
+print("Model 1")
+cm_predicted_lr_all_variables$overall['Accuracy']
+cm_predicted_lr_all_variables$byClass['Sensitivity']
+cm_predicted_lr_all_variables$byClass['Specificity']
+print("Model 2")
+cm_predicted_lr_significant$overall['Accuracy']
+cm_predicted_lr_significant$byClass['Sensitivity']
+cm_predicted_lr_significant$byClass['Specificity']
+print("Model 3")
+cm_predicted_lr_feeling1$overall['Accuracy']
+cm_predicted_lr_feeling1$byClass['Sensitivity']
+cm_predicted_lr_feeling1$byClass['Specificity']
+print("Model 4")
+cm_predicted_lr_feeling2$overall['Accuracy']
+cm_predicted_lr_feeling2$byClass['Sensitivity']
+cm_predicted_lr_feeling2$byClass['Specificity']
+print("Model 5")
+cm_predicted_lr_feeling3$overall['Accuracy']
+cm_predicted_lr_feeling3$byClass['Sensitivity']
+cm_predicted_lr_feeling3$byClass['Specificity']
+```
+
+#### Fitting a decision tree model
+
+```{r Decision_Tree_Libraries}
+library(rpart)
+library(rpart.plot)
+```
+
+```{r Decision_Tree_Training}
+decision_tree_training_all_variables <- rpart(Attrition_Status ~ Experience_in_Months + Employee_Age + Extraversion + Agreeableness + Conscientiousness + Neuroticism + Openness + Gender + Employee_Profession + Employee_Industry + Source_of_Hire + Coach + Head_Supervisor_Gender + Way_to_Work + Wage_Color,
+                                              data=attrition_cleansed_training)
+decision_tree_training_significant <- rpart(Attrition_Status ~ Experience_in_Months + Source_of_Hire + Way_to_Work,
+                                              data=attrition_cleansed_training)
+decision_tree_training_feeling1 <- rpart(Attrition_Status ~ Experience_in_Months + Employee_Profession + Employee_Industry + Source_of_Hire + Way_to_Work,
+                                              data=attrition_cleansed_training)
+decision_tree_training_feeling2 <- rpart(Attrition_Status ~ Experience_in_Months + Extraversion + Agreeableness + Conscientiousness + Employee_Profession + Employee_Industry + Source_of_Hire + Way_to_Work,
+                                              data=attrition_cleansed_training)
+decision_tree_training_feeling3 <- rpart(Attrition_Status ~ Experience_in_Months + Employee_Age + Extraversion + Agreeableness + Conscientiousness + Neuroticism + Gender + Employee_Profession + Employee_Industry + Source_of_Hire + Way_to_Work + Wage_Color,
+                                              data=attrition_cleansed_training)
+
+fitted_tree_training_all_variables <- predict(decision_tree_training_all_variables, type="class")
+fitted_tree_training_significant <- predict(decision_tree_training_significant, type="class")
+fitted_tree_training_feeling1 <- predict(decision_tree_training_feeling1, type="class")
+fitted_tree_training_feeling2 <- predict(decision_tree_training_feeling2, type="class")
+fitted_tree_training_feeling3 <- predict(decision_tree_training_feeling3, type="class")
+
+cm_tree_training_all_variables <- confusionMatrix(fitted_tree_training_all_variables, attrition_cleansed_training$Attrition_Status, positive="1")
+cm_tree_training_significant <- confusionMatrix(fitted_tree_training_significant, attrition_cleansed_training$Attrition_Status, positive="1")
+cm_tree_training_feeling1 <- confusionMatrix(fitted_tree_training_feeling1, attrition_cleansed_training$Attrition_Status, positive="1")
+cm_tree_training_feeling2 <- confusionMatrix(fitted_tree_training_feeling2, attrition_cleansed_training$Attrition_Status, positive="1")
+cm_tree_training_feeling3 <- confusionMatrix(fitted_tree_training_feeling3, attrition_cleansed_training$Attrition_Status, positive="1")
+
+cm_tree_training_all_variables
+cm_tree_training_significant
+cm_tree_training_feeling1
+cm_tree_training_feeling2
+cm_tree_training_feeling3
+```
+
+Making predictions on the validation set data:
+```{r tree1_test}
+predicted_tree_all_variables <- predict(decision_tree_training_all_variables, newdata = attrition_cleansed_validation, type = "class")
+predicted_tree_significant <- predict(decision_tree_training_significant, newdata = attrition_cleansed_validation, type = "class")
+predicted_tree_feeling1 <- predict(decision_tree_training_feeling1, newdata = attrition_cleansed_validation, type = "class")
+predicted_tree_feeling2 <- predict(decision_tree_training_feeling2, newdata = attrition_cleansed_validation, type = "class")
+predicted_tree_feeling3 <- predict(decision_tree_training_feeling3, newdata = attrition_cleansed_validation, type = "class")
+
+cm_tree_all_variables <- confusionMatrix(predicted_tree_all_variables, attrition_cleansed_validation$Attrition_Status, positive="1")
+cm_tree_significant <- confusionMatrix(predicted_tree_significant, attrition_cleansed_validation$Attrition_Status, positive="1")
+cm_tree_feeling1 <- confusionMatrix(predicted_tree_feeling1, attrition_cleansed_validation$Attrition_Status, positive="1")
+cm_tree_feeling2 <- confusionMatrix(predicted_tree_feeling2, attrition_cleansed_validation$Attrition_Status, positive="1")
+cm_tree_feeling3 <- confusionMatrix(predicted_tree_feeling3, attrition_cleansed_validation$Attrition_Status, positive="1")
+
+cm_tree_all_variables
+cm_tree_significant
+cm_tree_feeling1
+cm_tree_feeling2
+cm_tree_feeling3
+```
+
+Summarizing the performance of the models' in terms of accuracy, sensitivity, and specificity:
+```{r}
+print("Model 1")
+cm_tree_training_all_variables$overall['Accuracy']
+cm_tree_training_all_variables$byClass['Sensitivity']
+cm_tree_training_all_variables$byClass['Specificity']
+print("Model 2")
+cm_tree_training_significant$overall['Accuracy']
+cm_tree_training_significant$byClass['Sensitivity']
+cm_tree_training_significant$byClass['Specificity']
+print("Model 3")
+cm_tree_training_feeling1$overall['Accuracy']
+cm_tree_training_feeling1$byClass['Sensitivity']
+cm_tree_training_feeling1$byClass['Specificity']
+print("Model 4")
+cm_tree_training_feeling2$overall['Accuracy']
+cm_tree_training_feeling2$byClass['Sensitivity']
+cm_tree_training_feeling2$byClass['Specificity']
+print("Model 5")
+cm_tree_training_feeling3$overall['Accuracy']
+cm_tree_training_feeling3$byClass['Sensitivity']
+cm_tree_training_feeling3$byClass['Specificity']
+
+print("Model 1")
+cm_tree_all_variables$overall['Accuracy']
+cm_tree_all_variables$byClass['Sensitivity']
+cm_tree_all_variables$byClass['Specificity']
+print("Model 2")
+cm_tree_significant$overall['Accuracy']
+cm_tree_significant$byClass['Sensitivity']
+cm_tree_significant$byClass['Specificity']
+print("Model 3")
+cm_tree_feeling1$overall['Accuracy']
+cm_tree_feeling1$byClass['Sensitivity']
+cm_tree_feeling1$byClass['Specificity']
+print("Model 4")
+cm_tree_feeling2$overall['Accuracy']
+cm_tree_feeling2$byClass['Sensitivity']
+cm_tree_feeling2$byClass['Specificity']
+print("Model 5")
+cm_tree_feeling3$overall['Accuracy']
+cm_tree_feeling3$byClass['Sensitivity']
+cm_tree_feeling3$byClass['Specificity']
+```
+
+#### Fitting random forests
+
+```{r Random_Forest_Library}
+library(randomForest)
+```
+```{r Random_Forests}
+set.seed(100)
+forest_training_all_variables <- randomForest(Attrition_Status ~ Experience_in_Months + Employee_Age + Extraversion + Agreeableness + Conscientiousness + Neuroticism + Openness + Gender + Employee_Profession + Employee_Industry + Source_of_Hire + Coach + Head_Supervisor_Gender + Way_to_Work + Wage_Color,
+                                        data = attrition_cleansed_training, importance=TRUE, na.action = na.omit)
+forest_training_significant <- randomForest(Attrition_Status ~ Experience_in_Months + Source_of_Hire + Way_to_Work,
+                                        data = attrition_cleansed_training, importance=TRUE, na.action = na.omit)
+forest_training_feeling1 <- randomForest(Attrition_Status ~ Experience_in_Months + Employee_Profession + Employee_Industry + Source_of_Hire + Way_to_Work,
+                                        data = attrition_cleansed_training, importance=TRUE, na.action = na.omit)
+forest_training_feeling2 <- randomForest(Attrition_Status ~ Experience_in_Months + Extraversion + Agreeableness + Conscientiousness + Employee_Profession + Employee_Industry + Source_of_Hire + Way_to_Work,
+                                        data = attrition_cleansed_training, importance=TRUE, na.action = na.omit)
+forest_training_feeling3 <- randomForest(Attrition_Status ~ Experience_in_Months + Employee_Age + Extraversion + Agreeableness + Conscientiousness + Neuroticism + Gender + Employee_Profession + Employee_Industry + Source_of_Hire + Way_to_Work + Wage_Color,
+                                        data = attrition_cleansed_training, importance=TRUE, na.action = na.omit)
+
+forest_training_all_variables
+forest_training_significant
+forest_training_feeling1
+forest_training_feeling2
+forest_training_feeling3
+
+#Summarizing the training models' performance in terms of accuracy, sensitivity, and specificity.
+print("Model 1")
+# Accuracy
+print("Accuracy:")
+(236 + 286)/(236 + 154 + 109 + 286)
+# Sensitivity
+print("Sensitivity:")
+286/(286 + 154)
+# Specificity
+print("Specificity:")
+236/(236 + 109)
+
+print("Model 2")
+# Accuracy
+print("Accuracy:")
+(215 + 235)/(215 + 175 + 160 + 235)
+# Sensitivity
+print("Sensitivity:")
+235/(235 + 175)
+# Specificity
+print("Specificity:")
+215/(215 + 160)
+
+print("Model 3")
+# Accuracy
+print("Accuracy:")
+(235 + 286)/(235 + 155 + 109 + 286)
+# Sensitivity
+print("Sensitivity:")
+286/(286 + 155)
+# Specificity
+print("Specificity:")
+235/(235 + 109)
+
+print("Model 4")
+# Accuracy
+print("Accuracy:")
+(224 + 284)/(224 + 166 + 111 + 284)
+# Sensitivity
+print("Sensitivity:")
+284/(284 + 166)
+# Specificity
+print("Specificity:")
+224/(224 + 111)
+
+print("Model 5")
+# Accuracy
+print("Accuracy:")
+(239 + 281)/(239 + 151 + 114 + 281)
+# Sensitivity
+print("Sensitivity:")
+281/(281 + 151)
+# Specificity
+print("Specificity:")
+239/(239 + 114)
+
+#Making predictions on the validation set data:
+prediction_forest_all_variables <- predict(forest_training_all_variables, newdata = attrition_cleansed_validation, type = "class")
+confusion_prediction_forest_all_variables <- confusionMatrix(prediction_forest_all_variables, attrition_cleansed_validation$Attrition_Status, positive = "1")
+prediction_forest_significant <- predict(forest_training_significant, newdata = attrition_cleansed_validation, type = "class")
+confusion_prediction_forest_significant <- confusionMatrix(prediction_forest_significant, attrition_cleansed_validation$Attrition_Status, positive = "1")
+prediction_forest_feeling1 <- predict(forest_training_feeling1, newdata = attrition_cleansed_validation, type = "class")
+confusion_prediction_forest_feeling1 <- confusionMatrix(prediction_forest_feeling1, attrition_cleansed_validation$Attrition_Status, positive = "1")
+prediction_forest_feeling2 <- predict(forest_training_feeling2, newdata = attrition_cleansed_validation, type = "class")
+confusion_prediction_forest_feeling2 <- confusionMatrix(prediction_forest_feeling2, attrition_cleansed_validation$Attrition_Status, positive = "1")
+prediction_forest_feeling3 <- predict(forest_training_feeling3, newdata = attrition_cleansed_validation, type = "class")
+confusion_prediction_forest_feeling3 <- confusionMatrix(prediction_forest_feeling3, attrition_cleansed_validation$Attrition_Status, positive = "1")
+
+#Summarizing the validation models' performance in terms of accuracy, sensitivity, and specificity.
+print("Model 1")
+confusion_prediction_forest_all_variables$overall['Accuracy']
+confusion_prediction_forest_all_variables$byClass['Sensitivity']
+confusion_prediction_forest_all_variables$byClass['Specificity']
+print("Model 2")
+confusion_prediction_forest_significant$overall['Accuracy']
+confusion_prediction_forest_significant$byClass['Sensitivity']
+confusion_prediction_forest_significant$byClass['Specificity']
+print("Model 3")
+confusion_prediction_forest_feeling1$overall['Accuracy']
+confusion_prediction_forest_feeling1$byClass['Sensitivity']
+confusion_prediction_forest_feeling1$byClass['Specificity']
+print("Model 4")
+confusion_prediction_forest_feeling2$overall['Accuracy']
+confusion_prediction_forest_feeling2$byClass['Sensitivity']
+confusion_prediction_forest_feeling2$byClass['Specificity']
+print("Model 5")
+confusion_prediction_forest_feeling3$overall['Accuracy']
+confusion_prediction_forest_feeling3$byClass['Sensitivity']
+confusion_prediction_forest_feeling3$byClass['Specificity']
+```
